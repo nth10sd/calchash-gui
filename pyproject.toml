@@ -1,0 +1,158 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Update packages that do not have types in [[tool.mypy.overrides]]
+
+# When bumping minimum supported Python version, update:
+#   GitHub Actions settings file to also test the desired version
+#   setup.py, both install_requires and the classifiers
+#   tox.ini, under flake8 settings
+# Ensure python_version under [tool.mypy] tests the desired version
+# Ensure py-version under [tool.pylint.typing] is set as the desired minimum version
+
+# Ensure source under [tool.coverage.run] includes the package name
+# Ensure bandit_targets under [tool.pytest.ini_options] is set as the package name
+
+[tool.coverage.run]
+omit = [
+    "*/__main__.py",
+    "*/build/*",
+    "*/dist/*",
+    "*/.tox/*",
+    "*/.egg/*",
+]
+source = [
+    "calchashgui/",
+    "tests/",
+]
+
+[tool.coverage.report]
+# Taken from: https://coverage.readthedocs.io/en/coverage-5.5/config.html#syntax
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",  # Ignore missing debug-only code
+    "raise AssertionError",  # Ignore tests not hitting defensive assertion code
+    "raise NotImplementedError",  # Ignore tests not hitting defensive assertion code
+    "if 0:",  # Ignore non-runnable code not being run
+    "if __name__ == .__main__.:",  # Ignore non-runnable code not being run
+]
+fail_under = 80  # Minimum code coverage percent
+show_missing = true
+
+[tool.isort]
+force_single_line = true
+force_sort_within_sections = true
+line_length = 88
+profile = "black"
+
+[tool.pytest.ini_options]
+addopts = "--pylint-error-types=CRWEFI --cache-clear --durations=7 --no-cov-on-fail"
+bandit_recurse = true
+# 1 = LOW, 2 = MEDIUM, 3 = HIGH is the scale for the bandit's conf and sev levels
+bandit_conf_level = 1
+bandit_sev_level = 1
+# Update the following line with the package name
+bandit_targets = "calchashgui"
+markers = [
+    "slow",
+]
+
+[tool.mypy]
+namespace_packages = true
+python_version = "3.10"
+show_error_codes = true
+strict = true
+
+# Add Python modules to be ignored by mypy here
+# [[tool.mypy.overrides]]
+# module = []
+# ignore_missing_imports = true
+
+[tool.pylint.basic]
+# Good variable names which should always be accepted, separated by a comma
+good-names = ["i", "j", "k", "ex", "Run", "_", "f", "g"]
+
+[tool.pylint.design]
+max-attributes = 12
+
+[tool.pylint.format]
+max-line-length = 88
+
+[tool.pylint.imports]
+allow-any-import-level = ["resource", "winreg"]
+
+[tool.pylint.main]
+# Use multiple processes to speed up Pylint.
+# Note that sometimes the duplicate-code checker runs properly only when set to 1
+jobs = 3
+# Whole list retrieved on 2022-06-01 from: https://pylint.pycqa.org/en/latest/technical_reference/extensions.html
+load-plugins = [
+    "pylint.extensions.bad_builtin",
+    "pylint.extensions.broad_try_clause",
+    "pylint.extensions.check_elif",
+    "pylint.extensions.code_style",
+    "pylint.extensions.comparetozero",
+    "pylint.extensions.comparison_placement",
+    "pylint.extensions.confusing_elif",
+    "pylint.extensions.consider_ternary_expression",
+    "pylint.extensions.docparams",
+    "pylint.extensions.docstyle",
+    "pylint.extensions.empty_comment",
+    "pylint.extensions.emptystring",
+    "pylint.extensions.eq_without_hash",
+    "pylint.extensions.for_any_all",
+    "pylint.extensions.mccabe",
+    "pylint.extensions.no_self_use",
+    "pylint.extensions.overlapping_exceptions",
+    "pylint.extensions.private_import",
+    "pylint.extensions.redefined_loop_name",
+    "pylint.extensions.redefined_variable_type",
+    "pylint.extensions.set_membership",
+    "pylint.extensions.typing",
+    "pylint.extensions.while_used",
+]
+# Pickle collected data for later comparisons
+persistent = "no"
+
+[tool.pylint.similarities]
+ignore-comments = "no"
+# Ignore imports when computing similarities
+ignore-imports = "yes"
+min-similarity-lines = 5
+
+[tool.pylint.messages_control]
+disable = [
+    "locally-disabled",
+    "suppressed-message",
+]
+enable = [
+    "bad-inline-option",
+    "c-extension-no-member",
+    "deprecated-pragma",
+    "eq-without-hash",
+    "file-ignored",
+    "raw-checker-failed",
+    "use-symbolic-message-instead",
+    "useless-suppression",
+]
+
+[tool.pylint.parameter_documentation]
+accept-no-param-doc = "no"
+accept-no-raise-doc = "no"
+accept-no-return-doc = "no"
+accept-no-yields-doc = "no"
+
+[tool.pylint.reports]
+# Activate the evaluation score
+score = "no"
+
+[tool.pylint.typing]
+# Min Python version to use for typing related checks, e.g. ``3.7``
+# This should be equal to the min supported Python version of the project
+py-version = "3.10"
+
+[tool.tryceratops]
+ignore = [
+    "TC003",
+]

@@ -1,0 +1,117 @@
+# For more information on GitHub Actions for Python projects, see: https://git.io/JtENw
+
+name: pytest
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.operating-system }}
+    # Fixate to exact OS versions to avoid potential test failures over time
+    # Uncomment this line if we are running on a solitary OS
+    # runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        # Uncomment this line if we are running on multiple operating systems
+        operating-system: [ubuntu-20.04, macos-10.15, windows-2019]
+        python-version: ["3.10"]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    # pip cache dependencies to save time
+    - uses: actions/cache@v2
+      if: startsWith(runner.os, 'Linux')
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - uses: actions/cache@v2
+      if: startsWith(runner.os, 'macOS')
+      with:
+        path: ~/Library/Caches/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - uses: actions/cache@v2
+      if: startsWith(runner.os, 'Windows')
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        echo "::set-output name=dir::$(pip cache dir)"
+    - name: pip cache
+      uses: actions/cache@v2
+      with:
+        path: ${{ steps.pip-cache.outputs.dir }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install OS prerequisites
+      if: startsWith(runner.os, 'Linux')
+      run: sudo apt-get update ; sudo apt-get install ripgrep
+    - name: Search for existing linter ignore lines in Python
+      if: startsWith(runner.os, 'Linux')
+      run: |
+        rg -t py --stats "(?:(?:flake8|noqa|pylint|type): *(?:disable|ignore|noqa|[A-Z][0-9][0-9][0-9])| Any|REPLACEME)" \
+          $(find . -type f -name "*.py" ! -name "conf_correct.py") || true
+    - name: Ensure we are not increasing the number of ignore lines as a guideline
+      if: startsWith(runner.os, 'Linux')
+      run: |
+        if [ $(rg -t py --stats \
+                  "(?:(?:flake8|noqa|pylint|type): *(?:disable|ignore|noqa|[A-Z][0-9][0-9][0-9])| Any|REPLACEME)" \
+                  $(find . -type f -name "*.py" ! -name "conf_correct.py") \
+                    | awk "/ matches/ && "\!"/ contained matches/" \
+                    | cut -d" " -f1) -lt 8 ] ;
+        then exit 0 ; else exit 1 ; fi ;
+
+    - name: Install dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        python -u -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.txt
+
+    - name: Run with flake8 only checking for Python syntax errors or undefined names
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        python -u -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    - name: Run with yesqa to find obsolete flake8 ignores
+      if: startsWith(runner.os, 'Linux')
+      run: find . -type f -name "*.py" -not -path "./build/*" | xargs yesqa
+    - name: Run with flynt to find old-style formatting strings that can be converted to f-strings
+      if: startsWith(runner.os, 'Linux')
+      run: flynt --dry-run --fail-on-change --transform-concats .
+    - name: Run with pyupgrade to find code that can be written in a more modern way
+      run: pyup_dirs --py310-plus --recursive .
+    - name: Run with vulture to find dead code
+      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
+      run: python -u -m vulture $(python -c "import subprocess; out = subprocess.run([\"rg\", \"MODULE_NAME =\", \"setup.py\"], capture_output=True).stdout.decode(\"utf-8\"); print(out.split(\" = \\\"\", maxsplit=1)[-1].rstrip().removesuffix(\"\\\"\") + \"/\")") tests/ .vulture_allowlist
+    - name: Ensure Sphinx docs always work, resetting Git repo after generation
+      if: startsWith(runner.os, 'Linux')
+      run: pushd docs/ && ./gen-sphinx-html.sh ; git clean -fd ; popd
+    - name: Run tools using pytest, and also non-slow tests under code coverage
+      run: |
+        python -u -m pytest --bandit --black --cov --flake8 --mypy --pylint -m "not slow" --cov-report=term-missing --cov-report=xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v2
+      continue-on-error: true  # codecov limits number of uploads allowed for each commit
+      with:
+        env_vars: OS,PYTHON
+        fail_ci_if_error: true  # optional (default = false)
+        verbose: true
